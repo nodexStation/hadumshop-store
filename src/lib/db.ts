@@ -9,7 +9,12 @@ import { seedData } from "./seed";
 // env vars and run supabase/schema.sql; src/lib/supabase.ts exposes the client
 // and the schema mirrors these exact types. Prices/stock are ALWAYS
 // re-validated on the server in /api/orders — client totals are never trusted.
-const DATA_FILE = path.join(process.cwd(), "data", "store.json");
+// On Vercel/serverless the project directory is read-only, so the file DB
+// lives in /tmp (per-instance, resets on cold start — connect Supabase for
+// permanent production data). Locally it lives in data/store.json.
+const DATA_FILE = process.env.VERCEL
+  ? "/tmp/hadum-store.json"
+  : path.join(process.cwd(), "data", "store.json");
 
 let cache: StoreData | null = null;
 
@@ -26,11 +31,15 @@ export async function readData(): Promise<StoreData> {
 }
 
 export async function writeData(data: StoreData): Promise<void> {
-  cache = data;
-  await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
-  const tmp = `${DATA_FILE}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  await fs.rename(tmp, DATA_FILE);
+  cache = data; // in-memory copy always survives, even if disk is read-only
+  try {
+    await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+    const tmp = `${DATA_FILE}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
+    await fs.rename(tmp, DATA_FILE);
+  } catch {
+    // Read-only/ephemeral filesystem (serverless): keep serving from memory.
+  }
 }
 
 export function isDemoMode(): boolean {
