@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+<rect width="800" height="1000" fill="#f3ecdd"/>
+<rect x="0" y="0" width="800" height="14" fill="#a67c2e"/>
+<path d="M240 760 V430 a160 160 0 0 1 320 0 V760" fill="none" stroke="#a67c2e" stroke-width="5"/>
+<path d="M285 760 V460 a115 115 0 0 1 230 0 V760" fill="none" stroke="#c9a24b" stroke-width="2.5"/>
+<line x1="180" y1="760" x2="620" y2="760" stroke="#1c1917" stroke-width="4"/>
+<circle cx="400" cy="520" r="72" fill="#1c1917"/>
+<text x="400" y="545" font-family="Georgia, serif" font-size="76" font-weight="700" fill="#c9a24b" text-anchor="middle">H</text>
+<text x="400" y="840" font-family="Georgia, serif" font-size="44" font-weight="600" fill="#1c1917" text-anchor="middle">Card Wallet</text>
+<text x="400" y="890" font-family="Arial, sans-serif" font-size="24" letter-spacing="6" fill="#926820" text-anchor="middle">LIFESTYLE</text>
+<text x="400" y="945" font-family="Arial, sans-serif" font-size="19" letter-spacing="3" fill="#6e645a" text-anchor="middle">HADUM · DEMO IMAGE</text>
+</svg>

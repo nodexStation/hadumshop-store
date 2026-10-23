@@ -1,0 +1,9 @@
+node_modules/
+.next/
+data/store.json
+data/*.tmp
+.env.local
+.env*.local
+public/uploads/
+*.log
+.DS_Store
