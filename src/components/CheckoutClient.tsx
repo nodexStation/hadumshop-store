@@ -53,7 +53,7 @@ export default function CheckoutClient({ settings }: { settings: StoreSettings }
     setPlacing(false);
     if (res.ok && j.orderId) {
       clear();
-      router.push(`/order-success?id=${encodeURIComponent(j.orderId)}`);
+      router.push(`/order-success?id=${encodeURIComponent(j.orderId)}&phone=${encodeURIComponent(form.phone.replace(/[\s-]/g, ""))}`);
     } else {
       setServerError(j.error || "Could not place the order. Please check your cart and try again.");
     }

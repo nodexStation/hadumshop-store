@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { readData, writeData, isDemoMode } from "@/lib/db";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { normalizePhone, maskPhone } from "@/lib/phone";
 import type { Order, OrderItem } from "@/lib/types";
 
-function orderNumber(existing: Order[]): string {
+// Order numbers are random, not sequential: HDM-YYYYMMDD-<10 random hex>.
+// Sequential IDs (…-0001, 0002, …) let anyone enumerate every order; a
+// random suffix makes guessing an order number infeasible, and the phone
+// check in GET below is a second layer on top of that.
+function orderNumber(): string {
   const d = new Date();
   const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const seq = existing.filter((o) => o.id.includes(ymd)).length + 1;
-  return `HDM-${ymd}-${String(seq).padStart(4, "0")}`;
+  return `HDM-${ymd}-${randomBytes(5).toString("hex").toUpperCase()}`;
 }
 
 // POST /api/orders — creates a genuine order record.
 // SECURITY: every price, stock level and total is recomputed here from the
 // server-side catalogue. Client-submitted prices are never trusted.
 export async function POST(req: NextRequest) {
+  if (!rateLimit(req, "orders", 20, 10 * 60 * 1000))
+    return NextResponse.json(tooManyRequests(), { status: 429 });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   const { customer, items, paymentMethod } = body as {
@@ -68,7 +76,7 @@ export async function POST(req: NextRequest) {
     : customer.district === "Dhaka" ? settings.deliveryInsideDhaka : settings.deliveryOutsideDhaka;
 
   const order: Order = {
-    id: orderNumber(data.orders),
+    id: orderNumber(),
     items: orderItems,
     subtotal,
     deliveryCharge,
@@ -84,12 +92,35 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, orderId: order.id, total: order.total }, { status: 201 });
 }
 
-// GET /api/orders?id=HDM-... — public order lookup for the confirmation page.
+// GET /api/orders?id=HDM-...&phone=01XXXXXXXXX — order lookup.
+// SECURITY: this used to return the full order (name, phone, address) to
+// anyone who guessed a sequential order number. Now BOTH are required:
+// a random, unguessable order number AND the buyer's own phone number.
+// A missing/mismatched phone and a missing order all return the same
+// generic 404, so nothing leaks about which orders exist. Even on a
+// match, only a summary is returned — never the full name, street
+// address, or full phone number. The full confirmation lives on the
+// /order-success page, which applies the same phone check server-side.
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "Missing order id." }, { status: 400 });
+  const phone = normalizePhone(req.nextUrl.searchParams.get("phone") || "");
+  if (!id || !phone) return NextResponse.json({ error: "Order not found." }, { status: 404 });
   const data = await readData();
   const order = data.orders.find((o) => o.id === id);
-  if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
-  return NextResponse.json({ order });
+  if (!order || normalizePhone(order.customer.phone) !== phone)
+    return NextResponse.json({ error: "Order not found." }, { status: 404 });
+  return NextResponse.json({
+    order: {
+      id: order.id,
+      items: order.items,
+      subtotal: order.subtotal,
+      deliveryCharge: order.deliveryCharge,
+      total: order.total,
+      status: order.status,
+      createdAt: order.createdAt,
+      district: order.customer.district,
+      city: order.customer.city,
+      maskedPhone: maskPhone(order.customer.phone),
+    },
+  });
 }

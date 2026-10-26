@@ -15,7 +15,7 @@ export default function AdminLogin() {
     const res = await fetch("/api/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
     setBusy(false);
     if (res.ok) { router.refresh(); }
-    else setErr("Wrong password. (Local demo default is in README.md — change ADMIN_PASSWORD before going live.)");
+    else setErr("Wrong password.");
   }
 
   return (

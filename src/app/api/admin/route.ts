@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkPassword, setAdminCookie, clearAdminCookie, isAdmin } from "@/lib/auth";
+import { checkPassword, setAdminCookie, clearAdminCookie, isAdmin, isAdminConfigured } from "@/lib/auth";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { readData, writeData, newId, slugify } from "@/lib/db";
 import type { OrderStatus, Product, StoreSettings } from "@/lib/types";
 
@@ -11,6 +12,11 @@ async function guard() {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   if (body.action === "logout") { await clearAdminCookie(); return NextResponse.json({ ok: true }); }
+  // Fail closed before any password check: no env vars, no login at all.
+  if (!isAdminConfigured())
+    return NextResponse.json({ error: "Admin login is not configured." }, { status: 503 });
+  if (!rateLimit(req, "admin-login", 10, 15 * 60 * 1000))
+    return NextResponse.json(tooManyRequests(), { status: 429 });
   if (typeof body.password === "string" && checkPassword(body.password)) {
     await setAdminCookie();
     return NextResponse.json({ ok: true });
